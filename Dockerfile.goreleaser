@@ -1,0 +1,9 @@
+# This Dockerfile is intended to be used by Goreleaser
+FROM gcr.io/distroless/static:nonroot
+ENTRYPOINT ["/ttn-gateway-exporter"]
+LABEL org.opencontainers.image.source=https://github.com/opendata-heilbron/ttn-gateway-exporter
+LABEL org.opencontainers.image.authors=patrick246
+LABEL org.opencontainers.image.licenses=AGPL-3.0
+
+COPY ttn-gateway-exporter /
+USER nonroot

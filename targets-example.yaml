@@ -1,0 +1,3 @@
+targets:
+  - gateway_id: my-gateway-id
+    api_key: NNSXS.[redacted]

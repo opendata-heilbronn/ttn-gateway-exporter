@@ -1,0 +1,81 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    main: ./cmd/ttn-gateway-exporter
+    ldflags:
+      - -s -w
+archives:
+  - replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      386: i386
+      amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+dockers:
+  - image_templates:
+    - "ghcr.io/opendata-heilbronn/ttn-gateway-exporter:{{ .Tag }}-amd64"
+    dockerfile: Dockerfile.goreleaser
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - --pull
+      - --no-cache
+      - --force-rm
+      - --platform=linux/amd64
+  - image_templates:
+      - "ghcr.io/opendata-heilbronn/ttn-gateway-exporter:{{ .Tag }}-arm64"
+    dockerfile: Dockerfile.goreleaser
+    goos: linux
+    goarch: arm64
+    build_flag_templates:
+      - --pull
+      - --no-cache
+      - --force-rm
+      - --platform=linux/arm64
+  - image_templates:
+      - "ghcr.io/opendata-heilbronn/ttn-gateway-exporter:{{ .Tag }}-arm6"
+    dockerfile: Dockerfile.goreleaser
+    goos: linux
+    goarch: arm
+    goarm: '6'
+    build_flag_templates:
+      - --platform=linux/arm
+      - --pull
+      - --no-cache
+      - --force-rm
+docker_manifests:
+  - name_template: "ghcr.io/opendata-heilbronn/ttn-gateway-exporter:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/opendata-heilbronn/ttn-gateway-exporter:{{ .Tag }}-amd64"
+      - "ghcr.io/opendata-heilbronn/ttn-gateway-exporter:{{ .Tag }}-arm64"
+      - "ghcr.io/opendata-heilbronn/ttn-gateway-exporter:{{ .Tag }}-arm6"
+release:
+  github:
+    owner: opendata-heilbronn
+    name: ttn-gateway-exporter
+  header: |
+    Docker image: `ghcr.io/opendata-heilbronn/ttn-gateway-exporter:{{ .Tag }}`
