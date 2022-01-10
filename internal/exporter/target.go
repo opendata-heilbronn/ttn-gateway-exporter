@@ -47,6 +47,7 @@ func NewTarget(config config.Target) (*Target, error) {
 			"ip":                        desc(config.GatewayID, metricName("ip"), "Constantly 1. Exports the IP of the Gateway as label", []string{"num", "ip"}),
 			"protocol":                  desc(config.GatewayID, metricName("protocol"), "Constantly 1. Exports the used protocol by the Gateway as label", []string{"protocol"}),
 			"status_metrics":            desc(config.GatewayID, metricName("status_metrics"), "Gateway status metrics", []string{"metric"}),
+			"antenna_location":          desc(config.GatewayID, metricName("antenna_location"), "Constantly 1. Antenna Location", []string{"antenna", "lat", "lon", "accuracy", "altitude", "source"}),
 			"antenna_location_lat":      desc(config.GatewayID, metricName("antenna_location_lat"), "Antenna Latitude", []string{"antenna"}),
 			"antenna_location_lon":      desc(config.GatewayID, metricName("antenna_location_lon"), "Antenna Longitude", []string{"antenna"}),
 			"antenna_location_alt":      desc(config.GatewayID, metricName("antenna_location_alt"), "Antenna Altitude", []string{"antenna"}),
@@ -121,6 +122,17 @@ func (t *Target) Collect(metrics chan<- prometheus.Metric) {
 		metrics <- prometheus.MustNewConstMetric(t.descs["antenna_location_alt"], prometheus.GaugeValue, float64(antennaLocation.Altitude), antennaNumber)
 		metrics <- prometheus.MustNewConstMetric(t.descs["antenna_location_accuracy"], prometheus.GaugeValue, float64(antennaLocation.Accuracy), antennaNumber)
 		metrics <- prometheus.MustNewConstMetric(t.descs["antenna_location_source"], prometheus.GaugeValue, 1, antennaNumber, antennaLocation.Source)
+		metrics <- prometheus.MustNewConstMetric(
+			t.descs["antenna_location"],
+			prometheus.GaugeValue,
+			1,
+			antennaNumber,
+			fmt.Sprintf("%f", antennaLocation.Latitude),
+			fmt.Sprintf("%f", antennaLocation.Longitude),
+			fmt.Sprintf("%d", antennaLocation.Altitude),
+			fmt.Sprintf("%d", antennaLocation.Accuracy),
+			antennaLocation.Source,
+		)
 	}
 	for _, band := range stats.SubBands {
 		metrics <- prometheus.MustNewConstMetric(t.descs["subband_utilization_limit"], prometheus.GaugeValue, band.DownlinkUtilizationLimit, band.MinFrequency, band.MaxFrequency)
