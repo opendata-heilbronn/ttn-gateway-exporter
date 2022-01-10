@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"github.com/opendata-heilbronn/ttn-gateway-exporter/internal/config"
+	"github.com/opendata-heilbronn/ttn-gateway-exporter/internal/logging"
 	"github.com/opendata-heilbronn/ttn-gateway-exporter/internal/ttnclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var log = logging.Logger("target")
 
 type Target struct {
 	config config.Target
@@ -26,6 +29,7 @@ func NewTarget(config config.Target) (*Target, error) {
 		config: config,
 		client: client,
 		descs: map[string]*prometheus.Desc{
+			"last_scrape_result":        desc(config.GatewayID, metricName("last_scrape_result"), "1 if the scrape from the TTN API was successful", []string{}),
 			"connected_at":              desc(config.GatewayID, metricName("connected_at"), "Time the Gateway connected", []string{}),
 			"disconnected_at":           desc(config.GatewayID, metricName("disconnected_at"), "Time the Gateway disconnected", []string{}),
 			"last_status_at":            desc(config.GatewayID, metricName("last_status_at"), "Time TTN last received a status from the Gateway", []string{}),
@@ -66,20 +70,27 @@ func (t *Target) Collect(metrics chan<- prometheus.Metric) {
 
 	stats, err := t.client.GetGatewayConnectionStats(ctx, t.config.GatewayID)
 	if err != nil {
-		metrics <- prometheus.NewInvalidMetric(desc(t.config.GatewayID, "up", "", nil), err)
+		metrics <- prometheus.MustNewConstMetric(t.descs["last_scrape_result"], prometheus.GaugeValue, 0)
+		log.Errorw("scrape error", "target", t.config.GatewayID, "error", err)
 		return
+	} else {
+		metrics <- prometheus.MustNewConstMetric(t.descs["last_scrape_result"], prometheus.GaugeValue, 1)
 	}
 
-	if downlinkCount, err := strconv.ParseInt(stats.DownlinkCount, 10, 64); err != nil {
-		metrics <- prometheus.NewInvalidMetric(t.descs["downlink_count"], err)
+	if stats.DownlinkCount == "" {
+		metrics <- prometheus.MustNewConstMetric(t.descs["downlink_count"], prometheus.CounterValue, 0)
+	} else if downlinkCount, err := strconv.ParseInt(stats.DownlinkCount, 10, 64); err != nil {
+		log.Errorw("numeric string to int conversion error", "target", t.config.GatewayID, "source", "downlink_count", "value", stats.DownlinkCount)
 	} else {
-		metrics <- prometheus.MustNewConstMetric(t.descs["downlink_count"], prometheus.GaugeValue, float64(downlinkCount))
+		metrics <- prometheus.MustNewConstMetric(t.descs["downlink_count"], prometheus.CounterValue, float64(downlinkCount))
 	}
 
-	if uplinkCount, err := strconv.ParseInt(stats.UplinkCount, 10, 64); err != nil {
-		metrics <- prometheus.NewInvalidMetric(t.descs["uplink_count"], err)
+	if stats.UplinkCount == "" {
+		metrics <- prometheus.MustNewConstMetric(t.descs["uplink_count"], prometheus.CounterValue, 0)
+	} else if uplinkCount, err := strconv.ParseInt(stats.UplinkCount, 10, 64); err != nil {
+		log.Errorw("numeric string to int conversion error", "target", t.config.GatewayID, "source", "uplink_count", "value", stats.UplinkCount)
 	} else {
-		metrics <- prometheus.MustNewConstMetric(t.descs["uplink_count"], prometheus.GaugeValue, float64(uplinkCount))
+		metrics <- prometheus.MustNewConstMetric(t.descs["uplink_count"], prometheus.CounterValue, float64(uplinkCount))
 	}
 
 	metrics <- prometheus.MustNewConstMetric(t.descs["connected_at"], prometheus.GaugeValue, unixTime(stats.ConnectedAt))
@@ -90,7 +101,7 @@ func (t *Target) Collect(metrics chan<- prometheus.Metric) {
 	metrics <- prometheus.MustNewConstMetric(t.descs["rtt_min"], prometheus.GaugeValue, float64(stats.RoundTripTimes.Min))
 	metrics <- prometheus.MustNewConstMetric(t.descs["rtt_max"], prometheus.GaugeValue, float64(stats.RoundTripTimes.Max))
 	metrics <- prometheus.MustNewConstMetric(t.descs["rtt_median"], prometheus.GaugeValue, float64(stats.RoundTripTimes.Median))
-	metrics <- prometheus.MustNewConstMetric(t.descs["rtt_count"], prometheus.GaugeValue, float64(stats.RoundTripTimes.Count))
+	metrics <- prometheus.MustNewConstMetric(t.descs["rtt_count"], prometheus.CounterValue, float64(stats.RoundTripTimes.Count))
 	metrics <- prometheus.MustNewConstMetric(t.descs["time"], prometheus.GaugeValue, unixTime(stats.LastStatus.Time))
 	metrics <- prometheus.MustNewConstMetric(t.descs["boot_time"], prometheus.GaugeValue, unixTime(stats.LastStatus.BootTime))
 	for subsystem, version := range stats.LastStatus.Versions {
